@@ -1,5 +1,7 @@
 import React from 'react';
-import { Heading, Page, TextStyle, Layout, EmptyState } from "@shopify/polaris";
+import gql from 'graphql-tag';
+import { Mutation } from 'react-apollo';
+import { Page, Layout, EmptyState, Button, Card } from '@shopify/polaris';
 import { ResourcePicker, TitleBar } from '@shopify/app-bridge-react';
 import store from 'store-js';
 import ResourceListWithProducts from './components/ResourceList';
@@ -49,7 +51,6 @@ class Index extends React.Component {
             </EmptyState>
           </Layout>
         ) : (
-          // <p>Pendejo</p>
           <ResourceListWithProducts />
         )}
       </Page>

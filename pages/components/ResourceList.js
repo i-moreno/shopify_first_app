@@ -5,6 +5,7 @@ import { Card, ResourceItem, ResourceList, Stack, TextStyle, Thumbnail } from '@
 import store from 'store-js';
 import { Redirect } from '@shopify/app-bridge/actions';
 import { Context } from '@shopify/app-bridge';
+import ApplyRandomPrices from './ApplyRandomPrices';
 
 const GET_PRODUCTS_BY_ID = gql`
   query getProducts($ids: [ID!]!){
@@ -36,11 +37,16 @@ const GET_PRODUCTS_BY_ID = gql`
 `;
 
 class ResourceListWithProducts extends React.Component {
-  static contextType = Context;
+  constructor(props) {
+    super(props);
 
-  handleRenderItem = item => {
-    console.log("Item", item);
+    this.state = {
+      selectedItems: [],
+      selectedNodes: {}
+    };
+  }
 
+  handleRenderItem = (item, nodesById) => {
     const media = (
       <Thumbnail
         source={
@@ -63,11 +69,26 @@ class ResourceListWithProducts extends React.Component {
         id={item.id}
         media={media}
         accessibilityLabel={`View details for ${item.title}`}
+        verticalAlignment='center'
         onClick={() => {
-          store.set('item', item);
+          let index = this.state.selectedItems.indexOf(item.id);
+          const node = nodesById[item.id];
+
+          if (index === -1) {
+            this.state.selectedItems.push(item.id);
+            this.state.selectedNodes[item.id] = node;
+          } else {
+            this.state.selectedItems.splice(index, 1);
+            delete this.state.selectedNodes[item.id];
+          }
+
+          this.setState({
+            selectedItems: this.state.selectedItems,
+            selectedNodes: this.state.selectedNodes,
+          });
         }}
       >
-        <Stack>
+        <Stack alignment='center'>
           <Stack.Item fill>
             <h3>
               <TextStyle variation="strong">
@@ -83,28 +104,44 @@ class ResourceListWithProducts extends React.Component {
     );
   }
 
+  handleSelectionChange = (selectedItems, nodesById) => {
+    const selectedNodes = {};
+    selectedItems.forEach(item => selectedNodes[item] = nodesById[item]);
+
+    return this.setState({
+      selectedItems: selectedItems,
+      selectedNodes: selectedNodes
+    });
+  }
+
   render() {
-    const app = this.context;
 
     return (
       // GraphQL query to retrieve products and their prices
       <Query query={GET_PRODUCTS_BY_ID} variables={{ ids: store.get('ids') }}>
-        {({ data, loading, error }) => {
+        {({ data, loading, error, refetch }) => {
           if (loading) return <div>Loading…</div>;
           if (error) return <div>{error.message}</div>;
 
-          console.log("DATA", data)
-          console.log("NODES", data.nodes)
+          console.log("DATA->", data)
+          const nodesById = {};
+          data.nodes.forEach(node => nodesById[node.id] = node);
 
           return (
-            <Card>
-              <ResourceList
-                showHeader
-                resourceName={{ singular: 'Product', plural: 'Products' }}
-                items={data.nodes}
-                renderItem={item => this.handleRenderItem(item)}
-              />
-            </Card>
+            <React.Fragment>
+              <Card>
+                <ResourceList
+                  showHeader
+                  resourceName={{ singular: 'Product', plural: 'Products' }}
+                  items={data.nodes}
+                  selectable
+                  selectedItems={this.state.selectedItems}
+                  onSelectionChange={(selectedItems) => this.handleSelectionChange(selectedItems, nodesById)}
+                  renderItem={item => this.handleRenderItem(item, nodesById)}
+                />
+              </Card>
+              <ApplyRandomPrices selectedItems={this.state.selectedNodes} onUpdate={refetch} />
+            </React.Fragment>
           );
         }}
       </Query>
